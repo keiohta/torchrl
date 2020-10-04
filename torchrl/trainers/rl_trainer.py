@@ -1,4 +1,4 @@
-from torchrl.miscs import get_replay_buffer
+from torchrl.misc import get_replay_buffer
 
 
 class Trainer:
