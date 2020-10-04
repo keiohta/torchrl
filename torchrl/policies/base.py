@@ -25,6 +25,16 @@ class Policy(nn.Module):
     def get_action(self, observation, test=False):
         raise NotImplementedError
 
+    @staticmethod
+    def get_argument(parser=None):
+        import argparse
+        if parser is None:
+            parser = argparse.ArgumentParser(conflict_handler='resolve')
+        parser.add_argument('--n-warmup', type=int, default=int(1e4))
+        parser.add_argument('--batch-size', type=int, default=32)
+        parser.add_argument('--gpu', type=int, default=0, help='GPU id')
+        return parser
+
 
 class OffPolicyAgent(Policy):
     """Base class for off-policy agents"""

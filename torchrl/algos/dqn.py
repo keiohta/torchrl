@@ -81,6 +81,15 @@ class DQN(OffPolicyAgent):
         self.n_update = 0
         self.target_update_interval = target_update_interval
 
+    @staticmethod
+    def get_argument(parser=None):
+        parser = OffPolicyAgent.get_argument(parser)
+        parser.add_argument('--enable-double-dqn', action='store_true')
+        parser.add_argument('--enable-dueling-dqn', action='store_true')
+        parser.add_argument('--enable-categorical-dqn', action='store_true')
+        parser.add_argument('--enable-noisy-dqn', action='store_true')
+        return parser
+
     def get_action(self, state, test=False, tensor=False):
         if isinstance(state, LazyFrames):
             state = np.array(state)
