@@ -8,8 +8,11 @@ torchrl is a deep reinforcement and inverse reinforcement learning tool using Py
 
 Currently only available for local installation
 ```
+# support only through pip
+
 $ git clone git@github.com:sff1019/torchrl.git
 $ cd torchrl
+$ pip install -r requirements.txt
 $ pip install -e .
 ```
 
