@@ -59,6 +59,6 @@ def get_replay_buffer(policy,
         kwargs['env_dict']['next_obs']['dtype'] = np.ubtye
 
     if use_prioritized_rb:
-        return PrioritizedReplayBuffer(**kwrgs)
+        return PrioritizedReplayBuffer(**kwargs)
 
     return ReplayBuffer(**kwargs)

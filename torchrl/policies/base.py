@@ -28,5 +28,5 @@ class Policy(nn.Module):
 
 class OffPolicyAgent(Policy):
     """Base class for off-policy agents"""
-    def __init__(self, memory_capacity, **kwrags):
+    def __init__(self, memory_capacity, **kwargs):
         super().__init__(memory_capacity=memory_capacity, **kwargs)
