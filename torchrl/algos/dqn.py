@@ -146,7 +146,7 @@ class DQN(OffPolicyAgent):
             self.epsilon - self.epsilon_decay_rate * self.update_interval,
             self.epsilon_min)
 
-        return td_errors
+        return {'td_errors': td_errors, 'q_fn_loss': q_fn_loss}
 
     def _train(self, states, actions, next_states, rewards, done, weights):
         current_Q, target_Q = self._compute_q_values(states, actions,
