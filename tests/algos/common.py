@@ -2,6 +2,7 @@ import unittest
 
 import gym
 import numpy as np
+import torch
 
 
 class CommonAlgos(unittest.TestCase):
@@ -37,8 +38,9 @@ class CommonOffPolAlgos(CommonAlgos):
             self.assertEqual(action_test.shape[0], self.action_dim)
 
         # Multiple inputs
-        states = np.zeros(shape=(self.batch_size, state.shape[0]),
-                          dtype=np.float32)
+        states = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, state.shape[0]),
+                     dtype=np.float32))
         actions_train = self.agent.get_action(states, test=False)
         actions_test = self.agent.get_action(states, test=True)
 
@@ -55,12 +57,14 @@ class CommonOffPolAlgos(CommonAlgos):
         if self.agent is None:
             return
         # Multiple inputs
-        states = np.zeros(shape=(self.batch_size,
-                                 self.env.reset().astype(np.float32).shape[0]),
-                          dtype=np.float32)
+        states = torch.from_numpy(
+            np.zeros(shape=(self.batch_size,
+                            self.env.reset().astype(np.float32).shape[0]),
+                     dtype=np.float32))
         actions_train = self.agent.get_action(states, test=False)
         actions_test = self.agent.get_action(states, test=True)
 
+        # print(actions_test)
         # All actions should be same if `test=True`, and not same if `test=False`
         if self.is_discrete:
             self.assertEqual(np.prod(np.unique(actions_test).shape), 1)
@@ -75,36 +79,53 @@ class CommonOffPolAlgos(CommonAlgos):
     def test_train(self):
         if self.agent is None:
             return
-        rewards = np.zeros(shape=(self.batch_size, 1), dtype=np.float32)
-        dones = np.zeros(shape=(self.batch_size, 1), dtype=np.float32)
-        obses = np.zeros(shape=(self.batch_size, ) +
-                         self.env.observation_space.shape,
-                         dtype=np.float32)
-        acts = np.zeros(shape=(
-            self.batch_size,
-            self.action_dim,
-        ),
-                        dtype=np.float32)
+        rewards = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
+        dones = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
+        obses = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, ) +
+                     self.env.observation_space.shape,
+                     dtype=np.float32))
+        acts = torch.from_numpy(
+            np.zeros(shape=(
+                self.batch_size,
+                self.action_dim,
+            ),
+                     dtype=np.float32))
         self.agent.train(obses, acts, obses, rewards, dones)
 
     def test_compute_td_error(self):
         if self.agent is None:
             return
-        rewards = np.zeros(shape=(self.batch_size, 1), dtype=np.float32)
-        dones = np.zeros(shape=(self.batch_size, 1), dtype=np.float32)
-        obses = np.zeros(shape=(self.batch_size, ) +
-                         self.env.observation_space.shape,
-                         dtype=np.float32)
-        acts = np.zeros(shape=(
-            self.batch_size,
-            self.continuous_env.action_space.low.size,
-        ),
-                        dtype=np.float32)
+        rewards = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
+        dones = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
+        obses = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, ) +
+                     self.env.observation_space.shape,
+                     dtype=np.float32))
+        acts = torch.from_numpy(
+            np.zeros(shape=(
+                self.batch_size,
+                self.continuous_env.action_space.low.size,
+            ),
+                     dtype=np.float32))
         self.agent.compute_td_error(states=obses,
                                     actions=acts,
                                     next_states=obses,
                                     rewards=rewards,
                                     dones=dones)
+
+
+class CommonOffPolContinuousAlgos(CommonOffPolAlgos):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env = cls.continuous_env
+        cls.action_dim = cls.continuous_env.action_space.low.size
+        cls.is_discrete = False
 
 
 class CommonOffPolDiscreteAlgos(CommonOffPolAlgos):
