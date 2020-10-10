@@ -11,6 +11,7 @@ class TestSAC(CommonOffPolContinuousAlgos):
         cls.agent = SAC(
             state_shape=cls.continuous_env.observation_space.shape,
             action_dim=cls.continuous_env.action_space.low.size,
+            device=cls.device,
             batch_size=cls.batch_size,
         )
 
@@ -23,6 +24,7 @@ class TestSAC(CommonOffPolContinuousAlgos):
 #         cls.agent = SAC(
 #             state_shape=cls.continuous_env.observation_space.shape,
 #             action_dim=cls.continuous_env.action_space.low.size,
+#             device=cls.device,
 #             batch_size=cls.batch_size,
 #             auto_alpha=True,
 #         )
