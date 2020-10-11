@@ -40,3 +40,9 @@ class OffPolicyAgent(Policy):
     """Base class for off-policy agents"""
     def __init__(self, memory_capacity, **kwargs):
         super().__init__(memory_capacity=memory_capacity, **kwargs)
+
+    @staticmethod
+    def get_argument(parser=None):
+        parser = Policy.get_argument(parser)
+        parser.add_argument('--memory-capacity', type=int, default=int(1e6))
+        return parser

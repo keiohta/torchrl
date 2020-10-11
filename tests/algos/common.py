@@ -91,29 +91,28 @@ class CommonOffPolAlgos(CommonAlgos):
         with torch.autograd.set_detect_anomaly(True):
             self.agent.train(obses, acts, obses, rewards, dones)
 
-    # def test_compute_td_error(self):
-    #     if self.agent is None:
-    #         return
-    #     rewards = torch.from_numpy(
-    #         np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
-    #     dones = torch.from_numpy(
-    #         np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
-    #     obses = torch.from_numpy(
-    #         np.zeros(shape=(self.batch_size, ) +
-    #                  self.env.observation_space.shape,
-    #                  dtype=np.float32))
-    #     acts = torch.from_numpy(
-    #         np.zeros(shape=(
-    #             self.batch_size,
-    #             self.continuous_env.action_space.low.size,
-    #         ),
-    #                  dtype=np.float32))
-    #     self.agent.compute_td_error(states=obses,
-    #                                 actions=acts,
-    #                                 next_states=obses,
-    #                                 rewards=rewards,
-    #                                 dones=dones)
-    #
+    def test_compute_td_error(self):
+        if self.agent is None:
+            return
+        rewards = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
+        dones = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
+        obses = torch.from_numpy(
+            np.zeros(shape=(self.batch_size, ) +
+                     self.env.observation_space.shape,
+                     dtype=np.float32))
+        acts = torch.from_numpy(
+            np.zeros(shape=(
+                self.batch_size,
+                self.continuous_env.action_space.low.size,
+            ),
+                     dtype=np.float32))
+        self.agent.compute_td_error(states=obses,
+                                    actions=acts,
+                                    next_states=obses,
+                                    rewards=rewards,
+                                    dones=dones)
 
 
 class CommonOffPolContinuousAlgos(CommonOffPolAlgos):
