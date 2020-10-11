@@ -133,5 +133,64 @@ class CommonOffPolDiscreteAlgos(CommonOffPolAlgos):
         cls.is_discrete = True
 
 
+class CommonIRLAlgos(CommonAlgos):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.irl_discrete = None
+        cls.irl_continuous = None
+
+    def test_inference_discrete(self):
+        if self.irl_discrete is None:
+            return
+        state = torch.zeros([self.discrete_env.observation_space.low.size],
+                            dtype=torch.float32)
+        action = torch.zeros([self.discrete_env.action_space.n],
+                             dtype=torch.float32)
+        action[self.discrete_env.action_space.sample()] = 1.
+        self.irl_discrete.inference(state, action, state)
+
+    def test_inference_continuous(self):
+        if self.irl_continuous is None:
+            return
+        state = torch.zeros([self.continuous_env.observation_space.low.size],
+                            dtype=torch.float32)
+        action = torch.zeros([self.continuous_env.action_space.low.size],
+                             dtype=torch.float32)
+        self.irl_continuous.inference(state, action, state)
+
+    def test_train_discrete(self):
+        if self.irl_discrete is None:
+            return
+        states = torch.zeros(
+            [self.batch_size, self.discrete_env.observation_space.low.size],
+            dtype=torch.float32)
+        actions = torch.zeros(
+            [self.batch_size, self.discrete_env.action_space.n],
+            dtype=torch.float32)
+        self.irl_discrete.train(agent_states=states,
+                                agent_acts=actions,
+                                agent_next_states=states,
+                                expert_states=states,
+                                expert_acts=actions,
+                                expert_next_states=states)
+
+    def test_train_continuous(self):
+        if self.irl_continuous is None:
+            return
+        states = torch.zeros(
+            [self.batch_size, self.continuous_env.observation_space.low.size],
+            dtype=torch.float32)
+        actions = torch.zeros(
+            [self.batch_size, self.continuous_env.action_space.low.size],
+            dtype=torch.float32)
+        self.irl_continuous.train(agent_states=states,
+                                  agent_acts=actions,
+                                  agent_next_states=states,
+                                  expert_states=states,
+                                  expert_acts=actions,
+                                  expert_next_states=states)
+
+
 if __name__ == '__main__':
     unittest.main()

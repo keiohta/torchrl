@@ -3,7 +3,6 @@ import torch.nn as nn
 
 class Policy(nn.Module):
     def __init__(self,
-                 name,
                  memory_capacity,
                  update_interval=1,
                  batch_size=256,
@@ -13,7 +12,6 @@ class Policy(nn.Module):
                  n_epoch=1):
         super().__init__()
 
-        self.policy_name = name
         self.update_interval = update_interval
         self.batch_size = batch_size
         self.discount = discount
@@ -32,7 +30,6 @@ class Policy(nn.Module):
             parser = argparse.ArgumentParser(conflict_handler='resolve')
         parser.add_argument('--n-warmup', type=int, default=int(1e4))
         parser.add_argument('--batch-size', type=int, default=32)
-        parser.add_argument('--gpu', type=int, default=0, help='GPU id')
         return parser
 
 
@@ -46,3 +43,9 @@ class OffPolicyAgent(Policy):
         parser = Policy.get_argument(parser)
         parser.add_argument('--memory-capacity', type=int, default=int(1e6))
         return parser
+
+
+class IRLPolicy(Policy):
+    def __init__(self, n_training=1, memory_capacity=0, **kwargs):
+        self.n_training = n_training
+        super().__init__(memory_capacity=memory_capacity, **kwargs)

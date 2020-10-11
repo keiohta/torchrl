@@ -46,12 +46,16 @@ class RLTrainer:
             output_dir=self._output_dir)
 
         self._log_wandb = wandb_turn_on
+        self._monitor_gym = False
+        self._wandb_dict = None
         if wandb_turn_on:
+            self._wandb_dict = {}
             self._monitor_update_interval = 5e4
             wandb.init(entity=wandb_configs['entity'],
                        project=wandb_configs['project'],
                        name=wandb_configs['run_name'])
             self.wandb_configs = wandb_configs
+            self._monitor_gym = self.wandb_configs['monitor_gym']
 
     @staticmethod
     def get_argument(parser=None):
@@ -172,6 +176,8 @@ class RLTrainer:
                 self.logger.info(
                     "Total Epi: {0: 5} Steps: {1: 7} Episode Steps: {2: 5} Return: {3: 5.4f}"
                     .format(n_episode, step, episode_steps, episode_return))
+                if self._log_wandb:
+                    self._wanb_dic['Common/training_return'] = episode_return
 
                 episode_steps = 0
                 episode_return = 0
@@ -180,15 +186,14 @@ class RLTrainer:
             if step % self._policy.update_interval == 0:
                 samples = self._to_torch_tensor(
                     replay_buffer.sample(self._policy.batch_size))
-                outputs = self._policy.train(samples['obs'], samples['act'],
+                outputs = self._policy.train(samples['obs'],
+                                             samples['act'],
                                              samples['next_obs'],
-                                             samples['rew'], samples['done'])
+                                             samples['rew'],
+                                             samples['done'],
+                                             wandb_dict=self._wanb_dic)
 
-                if self._log_wandb:
-                    wandb.log(outputs)
-
-                    if self.wandb_configs[
-                            'monitor_gym'] and step % self._monitor_update_interval == 0:
+                    if self._monitor_gym and step % self._monitor_update_interval == 0:
                         fn = self.wandb_configs['gif_header'] + str(
                             step) + '.gif'
                         # obtain gym.env from rllab.env
@@ -207,6 +212,13 @@ class RLTrainer:
                 self.logger.info(
                     "Evaluation Total Steps: {0: 7} Average Reward {1: 5.4f} over {2: 2} episodes"
                     .format(step, avg_test_return, self._test_episodes))
+                if self._log_wandb:
+                    self._wandb_dict[
+                        'Common/average_test_return'] = avg_test_return
+                    self._wandb_dict['Common/fps'] = fps
+
+            if self._log_wandb:
+                wandb.log(outputs)
 
     def evaluate_policy(self, step):
         if self._normalize_obs:

@@ -139,12 +139,26 @@ class SAC(OffPolicyAgent):
               next_states,
               rewards,
               dones,
-              weights=None):
+              weights=None,
+              wandb_dict=None):
         if weights is None:
             weights = torch.ones_like(rewards)
 
         td_errors, actor_loss, vf_loss, qf_loss, logp_min, logp_max, logp_mean = self._train_body(
             states, actions, next_states, rewards, dones, weights)
+
+        # Log to wandb if set
+        if wandb_dict is not None:
+            wandb_dict['actor_loss'] = actor_loss
+            wandb_dict['critic_V_loss'] = vf_loss
+            wandb_dict['critic_Q_loss'] = qf_loss
+            wandb_dict['logp_min'] = logp_min
+            wandb_dict['logp_max'] = logp_max
+            wandb_dict['logp_mean'] = logp_mean
+            if self.auto_alpha:
+                wandb_dict['log_ent'] = log_alpha
+                wandb_dict['logp_mean+target'] = logp_mean + self.target_alpha
+            wandb_dict['ent'] = self.alpha
 
         return td_errors
 
