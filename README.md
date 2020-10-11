@@ -8,6 +8,7 @@ torchrl is a deep reinforcement and inverse reinforcement learning tool using Py
 |:----:|:---:|:----:|
 |DQN|Model-free Off-policy RL| Mid-way|
 |SAC|Model-free Off-policy RL| x|
+|GAIL|Imitation Learning| x|
 
 # Installation
 
