@@ -4,6 +4,7 @@ import os
 import time
 
 import numpy as np
+import torch
 import wandb
 
 from torchrl.misc import (get_replay_buffer, prepare_output_dir,
@@ -14,6 +15,7 @@ class RLTrainer:
     def __init__(self,
                  policy,
                  env,
+                 device,
                  args,
                  test_env=None,
                  wandb_turn_on=False,
@@ -33,6 +35,7 @@ class RLTrainer:
         self._policy = policy
         self._env = env
         self._test_env = self._env if test_env is None else test_env
+        self.device = device
 
         # prepare log directory
         self._output_dir = prepare_output_dir(
@@ -42,8 +45,8 @@ class RLTrainer:
             logging_level=logging.getLevelName(args.logging_level),
             output_dir=self._output_dir)
 
+        self._log_wandb = wandb_turn_on
         if wandb_turn_on:
-            self._log_wandb = wandb_turn_on
             self._monitor_update_interval = 5e4
             wandb.init(entity=wandb_configs['entity'],
                        project=wandb_configs['project'],
@@ -105,7 +108,7 @@ class RLTrainer:
 
     def _set_from_args(self, args):
         # experiment settings
-        self._max_steps = args.max_steps
+        self._max_steps = int(args.max_steps)
         self._episode_max_steps = (args.episode_max_steps
                                    if args.episode_max_steps is not None else
                                    args.max_steps)
@@ -175,31 +178,30 @@ class RLTrainer:
                 episode_start_time = time.perf_counter()
 
             if step % self._policy.update_interval == 0:
-                samples = replay_buffer.sample(self._policy.batch_size)
-                outputs = self._policy.train(
-                    samples['obs'], samples['act'],
-                    samples['next_obs'], samples['rew'],
-                    np.array(samples['done'], dtype=np.float32))
+                samples = self._to_torch_tensor(
+                    replay_buffer.sample(self._policy.batch_size))
+                outputs = self._policy.train(samples['obs'], samples['act'],
+                                             samples['next_obs'],
+                                             samples['rew'], samples['done'])
 
-                print(outputs)
                 if self._log_wandb:
                     wandb.log(outputs)
 
-                if self.wandb_configs[
-                        'monitor_gym'] and step % self._monitor_update_interval == 0:
-                    fn = self.wandb_configs['gif_header'] + str(step) + '.gif'
-                    # obtain gym.env from rllab.env
-                    render_env(self._env,
-                               path=self.wandb_configs['gif_dir'],
-                               filename=fn)
-                    if self._log_wandb:
-                        full_fn = os.path.join(os.getcwd(),
-                                               self.wandb_configs['gif_dir'],
-                                               fn)
-                        wandb.log({
-                            "video":
-                            wandb.Video(full_fn, fps=60, format="gif")
-                        })
+                    if self.wandb_configs[
+                            'monitor_gym'] and step % self._monitor_update_interval == 0:
+                        fn = self.wandb_configs['gif_header'] + str(
+                            step) + '.gif'
+                        # obtain gym.env from rllab.env
+                        render_env(self._env,
+                                   path=self.wandb_configs['gif_dir'],
+                                   filename=fn)
+                        if self._log_wandb:
+                            full_fn = os.path.join(
+                                os.getcwd(), self.wandb_configs['gif_dir'], fn)
+                            wandb.log({
+                                "video":
+                                wandb.Video(full_fn, fps=60, format="gif")
+                            })
             if step % self._test_interval == 0:
                 avg_test_return = self.evaluate_policy(step)
                 self.logger.info(
@@ -251,3 +253,16 @@ class RLTrainer:
             avg_test_return += episode_return
 
         return avg_test_return / self._test_episodes
+
+    def _to_torch_tensor(self, samples):
+        torch_samples = {}
+        torch_samples['obs'] = torch.from_numpy(samples['obs']).to(self.device)
+        torch_samples['act'] = torch.from_numpy(samples['act']).to(self.device)
+        torch_samples['next_obs'] = torch.from_numpy(samples['next_obs']).to(
+            self.device)
+        torch_samples['rew'] = torch.from_numpy(samples['rew']).to(self.device)
+        torch_samples['done'] = torch.tensor(samples['done'],
+                                             dtype=torch.float32).to(
+                                                 self.device)
+
+        return torch_samples

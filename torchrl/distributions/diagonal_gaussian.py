@@ -5,8 +5,12 @@ from torchrl.distributions import Distribution
 
 
 class DiagonalGaussian(Distribution):
-    def __init__(self, dim):
+    def __init__(self, dim, device=None):
         self._dim = dim
+        self.device = device
+        if device is None:
+            self.device = torch.device(
+                'cuda' if torch.cuda.is_available() else 'cpu')
 
     @property
     def dim(self):
@@ -55,8 +59,8 @@ class DiagonalGaussian(Distribution):
         means = param["mean"]
         log_stds = param["log_std"]
         # reparameterization
-        return means + torch.normal(mean=0.0, std=1.0,
-                                    size=means.shape) * torch.exp(log_stds)
+        return means + torch.normal(mean=0.0, std=1.0, size=means.shape).to(
+            self.device) * torch.exp(log_stds)
 
     def entropy(self, param):
         log_stds = param["log_std"]

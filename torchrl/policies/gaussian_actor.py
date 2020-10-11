@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -13,6 +15,7 @@ class GaussianActor(nn.Module):
     def __init__(self,
                  state_shape,
                  action_dim,
+                 device,
                  max_action,
                  units=[256, 256],
                  hidden_activation="relu",
@@ -28,10 +31,14 @@ class GaussianActor(nn.Module):
         self._squash = squash
         self._state_independent_std = state_independent_std
 
-        self.l1 = nn.Linear(state_shape[0], units[0])
-        self.relu1 = nn.ReLU()
-        self.l2 = nn.Linear(units[0], units[1])
-        self.relu2 = nn.ReLU()
+        print('in_dim', state_shape)
+        self.hidden_net = nn.Sequential(
+            OrderedDict([
+                ('l1', nn.Linear(state_shape[0], units[0])),
+                ('relu1', nn.ReLU()),
+                ('l2', nn.Linear(units[0], units[1])),
+                ('relu2', nn.ReLU()),
+            ]))
         self.out_mean = nn.Linear(units[1], action_dim)
         if not self._fix_std:
             if self._state_independent_std:
@@ -49,8 +56,7 @@ class GaussianActor(nn.Module):
             NN outputs mean and standard deviation to compute the distribution
         :return (Dict): Multivariate normal distribution
         """
-        features = self.relu1(self.l1(states))
-        features = self.relu2(self.l2(features))
+        features = self.hidden_net(states)
         mean = self.out_mean(features)
         if self._fix_std:
             log_std = torch.ones_like(mean) * torch.log(self._const_std)

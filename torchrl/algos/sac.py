@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -11,19 +13,17 @@ class CriticV(nn.Module):
     def __init__(self, state_shape, critic_units=(256, 256)):
         super(CriticV, self).__init__()
 
-        self.base_layers = []
-        in_dim = state_shape[0]
-        for unit in critic_units:
-            self.base_layers.append(nn.Linear(in_dim, unit))
-            self.base_layers.append(nn.ReLU())
-            in_dim = unit
-        self.out_layer = nn.Linear(critic_units[-1], 1)
+        self.net = nn.Sequential(
+            OrderedDict([
+                ('l1', nn.Linear(state_shape[0], critic_units[0])),
+                ('relu1', nn.ReLU()),
+                ('l2', nn.Linear(critic_units[0], critic_units[1])),
+                ('relu2', nn.ReLU()),
+                ('out', nn.Linear(critic_units[1], 1)),
+            ]))
 
     def forward(self, states):
-        features = states
-        for cur_layer in self.base_layers:
-            features = cur_layer(features)
-        values = self.out_layer(features)
+        values = self.net(states)
         return torch.squeeze(values, dim=1)
 
 
@@ -31,18 +31,18 @@ class CriticQ(nn.Module):
     def __init__(self, state_shape, action_dim, critic_units=(256, 256)):
         super(CriticQ, self).__init__()
 
-        self.base_layers = []
-        in_dim = state_shape[0] + action_dim
-        for unit in critic_units:
-            self.base_layers.append(nn.Linear(in_dim, unit))
-            self.base_layers.append(nn.ReLU())
-            in_dim = unit
-        self.out_layer = nn.Linear(critic_units[-1], 1)
+        self.net = nn.Sequential(
+            OrderedDict([
+                ('l1', nn.Linear(state_shape[0] + action_dim,
+                                 critic_units[0])),
+                ('relu1', nn.ReLU()),
+                ('l2', nn.Linear(critic_units[0], critic_units[1])),
+                ('relu2', nn.ReLU()),
+                ('out', nn.Linear(critic_units[1], 1)),
+            ]))
 
     def forward(self, features):
-        for idx, cur_layer in enumerate(self.base_layers):
-            features = cur_layer(features)
-        values = self.out_layer(features)
+        values = self.net(features)
         return torch.squeeze(values, dim=1)
 
 
@@ -97,6 +97,7 @@ class SAC(OffPolicyAgent):
                      max_action=1.):
         self.actor = GaussianActor(state_shape,
                                    action_dim,
+                                   self.device,
                                    max_action,
                                    squash=True,
                                    units=actor_units).to(self.device)
@@ -121,11 +122,12 @@ class SAC(OffPolicyAgent):
             state = torch.from_numpy(state)
         is_single_state = len(state.shape) == self.state_ndim
 
-        state = np.expand_dims(state, axis=0).astype(
-            np.float32) if is_single_state else state
-        action = self._get_action_body(torch.Tensor(state), test)
+        state = state.expand(1, state.shape[0]).type(
+            torch.FloatTensor) if is_single_state else state
+        state = state.to(self.device)
+        action = self._get_action_body(state, test)
 
-        return action.detach().numpy()[0] if is_single_state else action
+        return action.cpu().detach().numpy()[0] if is_single_state else action
 
     def _get_action_body(self, state, test):
         actions, log_pis = self.actor(state, test)
@@ -153,10 +155,10 @@ class SAC(OffPolicyAgent):
         rewards = torch.squeeze(rewards, dim=1)
         dones = torch.squeeze(dones, dim=1)
 
-        not_dones = 1. - dones.to(dtype=torch.float32)
+        not_dones = 1. - dones
 
         # Compute loss of critic Q
-        features = torch.cat([states, actions], dim=1)
+        features = torch.cat([states, actions], dim=1).to(self.device)
         current_q1 = self.qf1(features)
         current_q2 = self.qf2(features)
         next_v_target = self.vf_target(next_states)
@@ -214,7 +216,7 @@ class SAC(OffPolicyAgent):
 
     def _compute_td_error_body(self, states, actions, next_states, rewards,
                                dones):
-        not_dones = 1. - dones.to(dtype=torch.float32)
+        not_dones = 1. - dones
 
         # Compute TD errors for Q-value func
         features = torch.cat([states, actions], dim=1)
@@ -231,9 +233,9 @@ class SAC(OffPolicyAgent):
     def _update_optim(self, optim, net, loss, retain_graph=False):
         optim.zero_grad()
         loss.backward(retain_graph=retain_graph)
-        if self.grad_clip is not None:
-            for p in net.modules():
-                nn.utils.clip_grad_norm_(p.parameters(), self.grad_clip)
+        # if self.grad_clip is not None:
+        #     for p in net.modules():
+        #         nn.utils.clip_grad_norm_(p.parameters(), self.grad_clip)
         optim.step()
 
     @staticmethod
