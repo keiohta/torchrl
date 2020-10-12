@@ -70,9 +70,9 @@ smmap==3.0.4
 subprocess32==3.5.4
 tensorboard==2.3.0
 tensorboard-plugin-wit==1.7.0
-torch==1.8.0.dev20201010
+--pre torch==1.8.0.dev20201010
 -e git+git@github.com:sff1019/rltorch.git@da81282d46e8cf9e0a166364b40e7e884e909020#egg=torchrl
-torchvision==0.8.0.dev20201010
+--pre torchvision==0.8.0.dev20201010
 traitlets==5.0.4
 typing-extensions==3.7.4.3
 urllib3==1.25.10
