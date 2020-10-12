@@ -32,6 +32,7 @@ jobs:
           pip install gym
           pip install wandb
           pip install matplotlib
+          pip install opencv-python
       - name: Test with unittest
         run: |
           python -m unittest discover tests
