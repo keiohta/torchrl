@@ -3,6 +3,7 @@ import torch.nn as nn
 
 class Policy(nn.Module):
     def __init__(self,
+                 name,
                  memory_capacity,
                  update_interval=1,
                  batch_size=256,
@@ -12,6 +13,7 @@ class Policy(nn.Module):
                  n_epoch=1):
         super().__init__()
 
+        self.policy_name = name
         self.update_interval = update_interval
         self.batch_size = batch_size
         self.discount = discount

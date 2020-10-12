@@ -31,7 +31,6 @@ class GaussianActor(nn.Module):
         self._squash = squash
         self._state_independent_std = state_independent_std
 
-        print('in_dim', state_shape)
         self.hidden_net = nn.Sequential(
             OrderedDict([
                 ('l1', nn.Linear(state_shape[0], units[0])),

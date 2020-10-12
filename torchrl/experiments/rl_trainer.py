@@ -50,7 +50,7 @@ class RLTrainer:
         self._wandb_dict = None
         if wandb_turn_on:
             self._wandb_dict = {}
-            self._monitor_update_interval = 5e4
+            self._monitor_update_interval = 1e4
             wandb.init(entity=wandb_configs['entity'],
                        project=wandb_configs['project'],
                        name=wandb_configs['run_name'])
@@ -191,22 +191,22 @@ class RLTrainer:
                                              samples['next_obs'],
                                              samples['rew'],
                                              samples['done'],
-                                             wandb_dict=self._wanb_dic)
+                                             wandb_dict=self._wandb_dict)
 
-                    if self._monitor_gym and step % self._monitor_update_interval == 0:
-                        fn = self.wandb_configs['gif_header'] + str(
-                            step) + '.gif'
-                        # obtain gym.env from rllab.env
-                        render_env(self._env,
-                                   path=self.wandb_configs['gif_dir'],
-                                   filename=fn)
-                        if self._log_wandb:
-                            full_fn = os.path.join(
-                                os.getcwd(), self.wandb_configs['gif_dir'], fn)
-                            wandb.log({
-                                "video":
-                                wandb.Video(full_fn, fps=60, format="gif")
-                            })
+                if self._monitor_gym and step % self._monitor_update_interval == 0:
+                    fn = self.wandb_configs['gif_header'] + str(step) + '.gif'
+                    # obtain gym.env from rllab.env
+                    render_env(self._env,
+                               path=self.wandb_configs['gif_dir'],
+                               filename=fn)
+                    if self._log_wandb:
+                        full_fn = os.path.join(os.getcwd(),
+                                               self.wandb_configs['gif_dir'],
+                                               fn)
+                        wandb.log({
+                            "video":
+                            wandb.Video(full_fn, fps=60, format="gif")
+                        })
             if step % self._test_interval == 0:
                 avg_test_return = self.evaluate_policy(step)
                 self.logger.info(

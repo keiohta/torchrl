@@ -3,7 +3,7 @@ import argparse
 
 class WandB:
     @staticmethod
-    class get_argument(parser=None):
+    def get_argument(parser=None):
         if parser is None:
             parser = argparse.ArgumentParser(conflict_handler='resolve')
         # yapf: disable
