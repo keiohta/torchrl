@@ -14,6 +14,7 @@ class TestGaussianActor(CommonModel):
         cls.policy = GaussianActor(
             state_shape=cls.continuous_env.observation_space.shape,
             action_dim=cls.continuous_env.action_space.low.size,
+            device='cpu',
             max_action=1.,
             units=[4, 4])
 

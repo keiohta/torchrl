@@ -15,10 +15,11 @@ class TestRLTrainer(unittest.TestCase):
         test_env = gym.make("Pendulum-v0")
         policy = DQN(state_shape=env.observation_space.shape,
                      action_dim=env.action_space.high.size,
+                     device='cpu',
                      memory_capacity=1000,
                      batch_size=32,
                      n_warmup=10)
-        RLTrainer(policy, env, {}, test_env=test_env)
+        RLTrainer(policy, env, 'cpu', {}, test_env=test_env)
 
     def test_with_args(self):
         """
@@ -29,11 +30,13 @@ class TestRLTrainer(unittest.TestCase):
         test_env = gym.make("Pendulum-v0")
         policy = DQN(state_shape=env.observation_space.shape,
                      action_dim=env.action_space.high.size,
+                     device='cpu',
                      memory_capacity=1000,
                      batch_size=32,
                      n_warmup=10)
         trainer = RLTrainer(policy,
-                            env, {"max_steps": max_steps},
+                            env,
+                            'cpu', {"max_steps": max_steps},
                             test_env=test_env)
         self.assertEqual(trainer._max_steps, max_steps)
 
@@ -45,12 +48,14 @@ class TestRLTrainer(unittest.TestCase):
         test_env = gym.make("Pendulum-v0")
         policy = DQN(state_shape=env.observation_space.shape,
                      action_dim=env.action_space.high.size,
+                     device='cpu',
                      memory_capacity=1000,
                      batch_size=32,
                      n_warmup=10)
         with self.assertRaises(ValueError):
             RLTrainer(policy,
-                      env, {"NOT_EXISTING_OPTIONS": 1},
+                      env,
+                      'cpu', {"NOT_EXISTING_OPTIONS": 1},
                       test_env=test_env)
 
 

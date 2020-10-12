@@ -10,10 +10,12 @@ class TestGAIL(CommonIRLAlgos):
         super().setUpClass()
         cls.irl_discrete = GAIL(
             state_shape=cls.discrete_env.observation_space.shape,
-            action_dim=cls.discrete_env.action_space.n)
+            action_dim=cls.discrete_env.action_space.n,
+            name='GAIL')
         cls.irl_continuous = GAIL(
             state_shape=cls.continuous_env.observation_space.shape,
-            action_dim=cls.continuous_env.action_space.low.size)
+            action_dim=cls.continuous_env.action_space.low.size,
+            name='GAIL')
 
 
 if __name__ == '__main__':

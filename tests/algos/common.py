@@ -27,14 +27,12 @@ class CommonOffPolAlgos(CommonAlgos):
         if self.agent is None:
             return
         # Single input
-        state = self.env.reset()
+        state = torch.from_numpy(self.env.reset())
         action_train = self.agent.get_action(state, test=False)
         action_test = self.agent.get_action(state, test=True)
         if self.is_discrete:
-            self.assertTrue(
-                isinstance(action_train, (torch.int32, torch.int64, int)))
-            self.assertTrue(
-                isinstance(action_test, (torch.int32, torch.int64, int)))
+            self.assertTrue(isinstance(action_train, (torch.Tensor, int)))
+            self.assertTrue(isinstance(action_test, (torch.Tensor, int)))
         else:
             self.assertEqual(action_train.shape[0], self.action_dim)
             self.assertEqual(action_test.shape[0], self.action_dim)
@@ -58,25 +56,29 @@ class CommonOffPolAlgos(CommonAlgos):
         if self.agent is None:
             return
         # Multiple inputs
-        states = np.zeros(shape=(self.batch_size,
-                                 self.env.reset().astype(np.float32).shape[0]),
-                          dtype=np.float32)
+        states = torch.zeros(
+            [self.batch_size, self.env.reset().shape[0]], dtype=torch.float32)
         actions_train = self.agent.get_action(states, test=False)
         actions_test = self.agent.get_action(states, test=True)
 
         # All actions should be same if `test=True`, and not same if `test=False`
         if self.is_discrete:
-            self.assertEqual(torch.prod(torch.unique(actions_test).shape), 1)
-            self.assertGreater(torch.prod(torch.unique(actions_train).shape),
-                               1)
+            self.assertEqual(
+                torch.prod(torch.tensor(torch.unique(actions_test).shape[0])),
+                1)
+            self.assertGreater(
+                torch.prod(torch.tensor(torch.unique(actions_train).shape[0])),
+                1)
         else:
             self.assertEqual(
                 torch.prod(
-                    torch.all(actions_test == actions_test[0, :], axis=0)), 1)
+                    torch.all(torch.isclose(actions_test, actions_test[0, :]),
+                              axis=0)), 1)
             self.assertEqual(
                 torch.prod(
-                    torch.all(actions_train == actions_train[0, :], axis=0)),
-                0)
+                    torch.all(torch.isclose(actions_train,
+                                            actions_train[0, :]),
+                              axis=0)), 0)
 
     def test_train(self):
         if self.agent is None:
@@ -94,20 +96,14 @@ class CommonOffPolAlgos(CommonAlgos):
     def test_compute_td_error(self):
         if self.agent is None:
             return
-        rewards = torch.from_numpy(
-            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
-        dones = torch.from_numpy(
-            np.zeros(shape=(self.batch_size, 1), dtype=np.float32))
-        obses = torch.from_numpy(
-            np.zeros(shape=(self.batch_size, ) +
-                     self.env.observation_space.shape,
-                     dtype=np.float32))
-        acts = torch.from_numpy(
-            np.zeros(shape=(
-                self.batch_size,
-                self.continuous_env.action_space.low.size,
-            ),
-                     dtype=np.float32))
+        rewards = torch.zeros([self.batch_size, 1], dtype=torch.float32)
+        dones = torch.zeros([self.batch_size, 1], dtype=torch.float32)
+        obses = torch.zeros(
+            [self.batch_size, self.env.observation_space.shape[0]],
+            dtype=torch.float32)
+        acts = torch.zeros(
+            [self.batch_size, self.continuous_env.action_space.low.size],
+            dtype=torch.float32)
         self.agent.compute_td_error(states=obses,
                                     actions=acts,
                                     next_states=obses,

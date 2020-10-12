@@ -28,8 +28,6 @@ class QFunc(nn.Module):
             ])))
 
     def forward(self, x):
-        if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x)
         q_values = self.net(x)
 
         return q_values
@@ -39,6 +37,7 @@ class DQN(OffPolicyAgent):
     def __init__(self,
                  state_shape,
                  action_dim,
+                 device,
                  name='DQN',
                  q_fn=None,
                  loss_fn=None,
@@ -57,6 +56,8 @@ class DQN(OffPolicyAgent):
                          n_warmup=n_warmup,
                          **kwargs)
 
+        self.device = device
+
         q_fn = q_fn if q_fn is not None else QFunc
         # initialize Q function
         kwargs_dqn = {
@@ -71,7 +72,7 @@ class DQN(OffPolicyAgent):
 
         self._action_dim = action_dim
         # This is used to check if input state to `get_action` is multiple (batch) or single
-        self._state_ndim = np.array(state_shape).shape[0]
+        self._state_ndim = torch.tensor(state_shape).shape[0]
 
         # hyperparameters for trainig
         self.epsilon = epsilon
@@ -92,46 +93,39 @@ class DQN(OffPolicyAgent):
 
     def get_action(self, state, test=False, tensor=False):
         if isinstance(state, LazyFrames):
-            state = np.array(state)
-        if not tensor:
-            assert isinstance(state, np.ndarray)
+            state = torch.tensor(state)
         is_single_input = state.ndim == self._state_ndim
 
-        if not test and np.random.rand() < self.epsilon:
+        if not test and torch.rand(1).item() < self.epsilon:
             if is_single_input:
-                action = np.random.randint(self._action_dim)
+                action = torch.rand(self._action_dim)
             else:
-                action = np.array([
+                action = torch.tensor([
                     np.random.randint(self._action_dim)
                     for _ in range(state.shape[0])
                 ],
-                                  dtype=np.int64)
+                                      dtype=torch.int64)
 
-            if tensor:
-                return torch.from_numpy(action)
-            else:
-                return action
-
-        state = np.expand_dims(state, axis=0).astype(
-            np.float32) if is_single_input else state
-        action = self._get_action_body(torch.tensor(state))
-
-        if tensor:
             return action
-        else:
-            if is_single_input:
-                return action.numpy()[0]
-            else:
-                return action.numpy()
 
-    def _get_action_body(self, state):
+        state = state.expand(1, state.shape[0]).type(
+            torch.FloatTensor) if is_single_input else state
+        state = state.to(self.device)
+        action = self._get_action_body(state, test)
+
+        if is_single_input:
+            return action[0]
+        else:
+            return action
+
+    def _get_action_body(self, state, test=False):
         q_values = self.q_fn(state)
 
         return torch.argmax(q_values, axis=1)
 
     def train(self, states, actions, next_states, rewards, done, weights=None):
         if weights is None:
-            weights = np.ones_like(rewards)
+            weights = torch.ones_like(rewards)
 
         td_errors, q_fn_loss = self._train(states, actions, next_states,
                                            rewards, done, weights)
@@ -156,8 +150,7 @@ class DQN(OffPolicyAgent):
         td_errors = current_Q - target_Q
         # compute Huber loss
         q_fn_loss = torch.mean(
-            self.loss_fn(current_Q - target_Q, delta=self.max_grad) *
-            torch.from_numpy(weights))
+            self.loss_fn(current_Q - target_Q, delta=self.max_grad) * weights)
 
         # optimizer model
         self.optimizer.zero_grad()
@@ -175,9 +168,9 @@ class DQN(OffPolicyAgent):
 
     def _compute_q_values(self, states, actions, next_states, rewards, dones):
         batch_size = states.shape[0]
-        not_dones = 1. - torch.from_numpy(dones)
-        actions = torch.from_numpy(actions).type(torch.int32)
-        rewards = torch.from_numpy(rewards)
+        not_dones = 1. - dones
+        actions = actions.type(torch.int32)
+        rewards = rewards
 
         indices = torch.cat(
             [torch.unsqueeze(torch.arange(0, batch_size), dim=1), actions],
