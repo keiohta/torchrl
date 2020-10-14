@@ -12,11 +12,10 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', type=float, default=0.2)
     parser.add_argument('--auto-alpha', action="store_true")
     parser.add_argument('--env-name', type=str, default="Pendulum-v0")
-    parser.add_argument('--no-cuda', action='store_true')
+    parser.add_argument('--no_cuda', action='store_true')
     parser.set_defaults(batch_size=256)
     parser.set_defaults(n_warmup=10000)
     parser.set_defaults(max_steps=3e6)
-    parser.add_argument('--device', )
     args = parser.parse_args()
 
     use_cuda = not args.no_cuda and torch.cuda.is_available()
