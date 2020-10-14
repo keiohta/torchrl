@@ -1,4 +1,4 @@
-name: Check Lint using YAPF
+name: Check YAPF
 on: [push, pull_request]
 jobs:
   formatting-check:
