@@ -8,6 +8,7 @@ Hence, all the kudos go to tf2rl.
 
 |Algorithm|Category|Check Results|
 |:----:|:---:|:----:|
+|DDPG|Model-free Off-policy RL| x |
 |DQN|Model-free Off-policy RL| Mid-way|
 |SAC|Model-free Off-policy RL| x|
 |GAIL|Imitation Learning| x|
