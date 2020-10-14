@@ -1,3 +1,4 @@
+![unittest](https://github.com/sff1019/torchrl/workflows/unittest/badge.svg)
 # torchrl
 
 torchrl is a deep reinforcement and inverse reinforcement learning tool using PyTorch.
