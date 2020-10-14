@@ -174,8 +174,9 @@ class RLTrainer:
                 fps = episode_steps / (time.perf_counter() -
                                        episode_start_time)
                 self.logger.info(
-                    "Total Epi: {0: 5} Steps: {1: 7} Episode Steps: {2: 5} Return: {3: 5.4f}"
-                    .format(n_episode, step, episode_steps, episode_return))
+                    "Total Epi: {0: 5} Steps: {1: 7} Episode Steps: {2: 5} Return: {3: 5.4f} FPS: {4:5.2f}"
+                    .format(n_episode, step, episode_steps, episode_return,
+                            fps))
                 if self._log_wandb:
                     self._wanb_dic['Common/training_return'] = episode_return
 
