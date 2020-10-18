@@ -45,11 +45,13 @@ class GAIL(IRLPolicy):
     def __init__(self,
                  state_shape,
                  action_dim,
+                 device,
                  units=[32, 32],
                  lr=0.001,
                  enable_sn=False,
                  **kwargs):
         super().__init__(n_training=1, **kwargs)
+        self.device = device
         self.disc = Discriminator(state_shape=state_shape,
                                   action_dim=action_dim,
                                   units=units,
@@ -81,6 +83,12 @@ class GAIL(IRLPolicy):
 
     def _train_body(self, agent_states, agent_acts, expert_states,
                     expert_acts):
+        # put on device
+        agent_states = agent_states.to(self.device)
+        agent_acts = agent_acts.to(self.device)
+        expert_states = expert_states.to(self.device)
+        expert_acts = expert_acts.to(self.device)
+
         epsilon = 1e-8
         real_logits = self.disc(torch.cat((expert_states, expert_acts), dim=1))
         fake_logits = self.disc(torch.cat((agent_states, agent_acts), dim=1))
