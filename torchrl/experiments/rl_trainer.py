@@ -184,6 +184,9 @@ class RLTrainer:
                 episode_return = 0
                 episode_start_time = time.perf_counter()
 
+            if step < self._policy.n_warmup:
+                continue
+
             if step % self._policy.update_interval == 0:
                 samples = self._to_torch_tensor(
                     replay_buffer.sample(self._policy.batch_size))
@@ -193,6 +196,13 @@ class RLTrainer:
                                              samples['rew'],
                                              samples['done'],
                                              wandb_dict=self._wandb_dict)
+                if self._use_prioritized_rb:
+                    td_error = self._policy.compute_td_error(
+                        samples["obs"], samples["act"], samples["next_obs"],
+                        samples["rew"],
+                        np.array(samples["done"], dtype=np.float32))
+                    replay_buffer.update_priorities(samples["indexes"],
+                                                    np.abs(td_error) + 1e-6)
 
                 if self._monitor_gym and step % self._monitor_update_interval == 0:
                     fn = self.wandb_configs['gif_header'] + str(step) + '.gif'
@@ -208,6 +218,7 @@ class RLTrainer:
                             "video":
                             wandb.Video(full_fn, fps=60, format="gif")
                         })
+
             if step % self._test_interval == 0:
                 avg_test_return = self.evaluate_policy(step)
                 self.logger.info(
