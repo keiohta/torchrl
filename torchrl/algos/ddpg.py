@@ -99,9 +99,9 @@ class DDPG(OffPolicyAgent):
         self.critic_optim = optim.Adam(self.critic.parameters(), lr=lr_critic)
         update_network_variables(self.critic_target, self.critic, tau=1.)
 
-    def get_action(self, state, test=False, tensor=False):
+    def get_action(self, state, test=False):
         if isinstance(state, np.ndarray):
-            state = torch.from_numpy(state)
+            state = torch.from_numpy(state).to(self.device)
         is_single_state = len(state.shape) == 1
         state = state.expand([1, state.shape[0]]).type(
             torch.float32) if is_single_state else state
@@ -113,7 +113,8 @@ class DDPG(OffPolicyAgent):
     def _get_action_body(self, state, sigma, max_action):
         action = self.actor(state)
         if sigma > 0.:
-            action += torch.normal(mean=0., std=sigma, size=action.shape)
+            action += torch.normal(mean=0., std=sigma,
+                                   size=action.shape).to(self.device)
         return torch.clamp(action, -max_action, max_action)
 
     def train(self,
@@ -132,13 +133,16 @@ class DDPG(OffPolicyAgent):
         if wandb_dict is not None:
             if actor_loss is not None:
                 wandb_dict['actor_loss'] = actor_loss
-            wandb_dict['ciritc_loss', critic_loss]
+            wandb_dict['ciritc_loss'] = critic_loss
 
         return td_errors
 
     def _train_body(self, states, actions, next_states, rewards, done,
                     weights):
         states, actions = states.to(self.device), actions.to(self.device)
+        next_states = next_states.to(self.device)
+        rewards, done = rewards.to(self.device), done.to(self.device)
+
         td_errors = self._compute_td_error_body(states, actions, next_states,
                                                 rewards, done)
         critic_loss = torch.mean(td_errors**2)
