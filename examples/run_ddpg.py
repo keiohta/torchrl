@@ -16,6 +16,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # setup wandb
+    wandb_configs = None
     if args.wandb_turn_on:
         wandb_configs = {}
         for arg in vars(args):

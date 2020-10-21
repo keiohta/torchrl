@@ -136,6 +136,7 @@ class RLTrainer:
         self._show_test_images = args.show_test_images
 
     def __call__(self):
+        total_steps = 0
         episode_steps = 0
         episode_return = 0
         episode_start_time = time.perf_counter()
@@ -147,8 +148,8 @@ class RLTrainer:
 
         obs = self._env.reset()
 
-        for step in range(self._max_steps):
-            if step < self._policy.n_warmup:
+        while total_steps < self._max_steps:
+            if total_steps < self._policy.n_warmup:
                 action = self._env.action_space.sample()
             else:
                 action = self._policy.get_action(obs)
@@ -156,14 +157,17 @@ class RLTrainer:
             next_obs, reward, done, _ = self._env.step(action)
             episode_steps += 1
             episode_return += reward
+            total_steps += 1
 
             done_flag = done
+            if (hasattr(self._env, "_max_episode_steps")
+                    and episode_steps == self._env._max_episode_steps):
+                done_flag = False
             replay_buffer.add(obs=obs,
                               act=action,
                               next_obs=next_obs,
                               rew=reward,
                               done=done_flag)
-
             obs = next_obs
 
             if done or episode_steps == self._episode_max_steps:
@@ -175,27 +179,32 @@ class RLTrainer:
                                        episode_start_time)
                 self.logger.info(
                     "Total Epi: {0: 5} Steps: {1: 7} Episode Steps: {2: 5} Return: {3: 5.4f} FPS: {4:5.2f}"
-                    .format(n_episode, step, episode_steps, episode_return,
-                            fps))
+                    .format(n_episode, total_steps, episode_steps,
+                            episode_return, fps))
                 if self._log_wandb:
-                    self._wanb_dic['Common/training_return'] = episode_return
+                    self._wandb_dict['Common/training_return'] = episode_return
 
                 episode_steps = 0
                 episode_return = 0
                 episode_start_time = time.perf_counter()
 
-            if step < self._policy.n_warmup:
+            if total_steps < self._policy.n_warmup:
                 continue
 
-            if step % self._policy.update_interval == 0:
+            if total_steps % self._policy.update_interval == 0:
                 samples = self._to_torch_tensor(
                     replay_buffer.sample(self._policy.batch_size))
+
+                # train policy
                 outputs = self._policy.train(samples['obs'],
                                              samples['act'],
                                              samples['next_obs'],
                                              samples['rew'],
                                              samples['done'],
                                              wandb_dict=self._wandb_dict)
+                if self._log_wandb and total_steps % self._save_summary_interval == 0:
+                    wandb.log(self._wandb_dict)
+
                 if self._use_prioritized_rb:
                     td_error = self._policy.compute_td_error(
                         samples["obs"], samples["act"], samples["next_obs"],
@@ -204,33 +213,32 @@ class RLTrainer:
                     replay_buffer.update_priorities(samples["indexes"],
                                                     np.abs(td_error) + 1e-6)
 
-                if self._monitor_gym and step % self._monitor_update_interval == 0:
-                    fn = self.wandb_configs['gif_header'] + str(step) + '.gif'
-                    # obtain gym.env from rllab.env
-                    render_env(self._env,
-                               path=self.wandb_configs['gif_dir'],
-                               filename=fn)
-                    if self._log_wandb:
-                        full_fn = os.path.join(os.getcwd(),
-                                               self.wandb_configs['gif_dir'],
-                                               fn)
-                        wandb.log({
-                            "video":
-                            wandb.Video(full_fn, fps=60, format="gif")
-                        })
+                if self._monitor_gym and total_steps % self._monitor_update_interval == 0:
+                    self._log_gym_to_wandb(self.wandb_configs['gif_header'] +
+                                           str(total_steps) + '.gif')
 
-            if step % self._test_interval == 0:
-                avg_test_return = self.evaluate_policy(step)
+            if total_steps % self._test_interval == 0:
+                avg_test_return = self.evaluate_policy(total_steps)
                 self.logger.info(
                     "Evaluation Total Steps: {0: 7} Average Reward {1: 5.4f} over {2: 2} episodes"
-                    .format(step, avg_test_return, self._test_episodes))
+                    .format(total_steps, avg_test_return, self._test_episodes))
                 if self._log_wandb:
                     self._wandb_dict[
                         'Common/average_test_return'] = avg_test_return
                     self._wandb_dict['Common/fps'] = fps
 
             if self._log_wandb:
-                wandb.log(outputs)
+                wandb.log(self._wandb_dict)
+
+    def _log_gym_to_wandb(self, filename):
+        # obtain gym.env from rllab.env
+        render_env(self._env,
+                   path=self.wandb_configs['gif_dir'],
+                   filename=filename)
+        if self._log_wandb:
+            full_fn = os.path.join(os.getcwd(), self.wandb_configs['gif_dir'],
+                                   filename)
+            wandb.log({"video": wandb.Video(full_fn, fps=60, format="gif")})
 
     def evaluate_policy(self, step):
         if self._normalize_obs:
