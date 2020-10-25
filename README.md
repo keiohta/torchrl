@@ -11,11 +11,11 @@ Hence, all the kudos go to tf2rl.
 
 |Algorithm|Category|Check Results|
 |:----:|:---:|:----:|
-|BC|Imitation Learning| x|
-|DDPG|Model-free Off-policy RL| x |
-|DQN|Model-free Off-policy RL| Mid-way|
-|GAIL|Imitation Learning| x|
-|SAC|Model-free Off-policy RL| x|
+|BC|Imitation Learning| x |
+|DDPG|Model-free Off-policy RL| ✓ |
+|DQN|Model-free Off-policy RL| Mid-way |
+|GAIL|Imitation Learning| x |
+|SAC|Model-free Off-policy RL| ✓ |
 
 ## Algorithm Reference
 
