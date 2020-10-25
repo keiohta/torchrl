@@ -10,6 +10,8 @@ import wandb
 from torchrl.misc import (get_replay_buffer, prepare_output_dir,
                           initialize_logger, render_env)
 
+torch.backends.cudnn.benchmark = True
+
 
 class RLTrainer:
     def __init__(self,

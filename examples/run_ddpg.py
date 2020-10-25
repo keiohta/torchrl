@@ -6,6 +6,7 @@ from torchrl.experiments import RLTrainer as Trainer
 from torchrl.experiments import WandB
 
 if __name__ == '__main__':
+    torch.set_num_threads(8)
     parser = Trainer.get_argument()
     parser = DDPG.get_argument(parser)
     parser = WandB.get_argument(parser)
