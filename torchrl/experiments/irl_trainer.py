@@ -3,7 +3,7 @@ import time
 import numpy as np
 import torch
 
-from torch.experiments import RLTrainer as Trainer
+from torchrl.experiments.rl_trainer import RLTrainer as Trainer
 from torchrl.misc import (get_replay_buffer, prepare_output_dir,
                           initialize_logger, render_env)
 
@@ -12,6 +12,7 @@ class IRLTrainer(Trainer):
     def __init__(self,
                  policy,
                  env,
+                 device,
                  args,
                  irl,
                  expert_obs,
@@ -20,11 +21,11 @@ class IRLTrainer(Trainer):
                  test_env=None):
         self._irl = irl
         args.dir_suffix = self._irl.policy_name + args.dir_suffix
-        super().__init__(policy, env, args, test_env)
+        super().__init__(policy, env, device, args, test_env)
         # TODO: Add assertion to check dimention of expert demos and current policy, env is the same
-        self._expert_obs = expert_obs
-        self._expert_next_obs = expert_next_obs
-        self._expert_act = expert_act
+        self._expert_obs = torch.from_numpy(expert_obs)
+        self._expert_next_obs = torch.from_numpy(expert_next_obs)
+        self._expert_act = torch.from_numpy(expert_act)
         # Minus one to get next obs
         self._random_range = range(expert_obs.shape[0])
 
@@ -89,7 +90,8 @@ class IRLTrainer(Trainer):
                     continue
 
                 if total_steps % self._policy.update_interval == 0:
-                    samples = replay_buffer.sample(self._policy.batch_size)
+                    samples = self._to_torch_tensor(
+                        replay_buffer.sample(self._policy.batch_size))
                     # Train policy
                     rew = self._irl.inference(samples["obs"], samples["act"],
                                               samples["next_obs"])
@@ -107,7 +109,8 @@ class IRLTrainer(Trainer):
 
                     # Train IRL
                     for _ in range(self._irl.n_training):
-                        samples = replay_buffer.sample(self._irl.batch_size)
+                        samples = self._to_torch_tensor(
+                            replay_buffer.sample(self._irl.batch_size))
                         # Do not allow duplication!!!
                         indices = np.random.choice(self._random_range,
                                                    self._irl.batch_size,
@@ -131,8 +134,8 @@ class IRLTrainer(Trainer):
                             'Common/average_test_return'] = avg_test_return
                         self._wandb_dict['Common/fps'] = fps
 
-                if total_steps % self._save_model_interval == 0:
-                    self.checkpoint_manager.save()
+                # if total_steps % self._save_model_interval == 0:
+                #     self.checkpoint_manager.save()
 
     @staticmethod
     def get_argument(parser=None):

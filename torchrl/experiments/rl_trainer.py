@@ -176,6 +176,9 @@ class RLTrainer:
                 replay_buffer.on_episode_end()
                 obs = self._env.reset()
 
+                if self._log_wandb:
+                    self._wandb_dict['Common/training_return'] = episode_return
+
                 n_episode += 1
                 fps = episode_steps / (time.perf_counter() -
                                        episode_start_time)
@@ -183,8 +186,6 @@ class RLTrainer:
                     "Total Epi: {0: 5} Steps: {1: 7} Episode Steps: {2: 5} Return: {3: 5.4f} FPS: {4:5.2f}"
                     .format(n_episode, total_steps, episode_steps,
                             episode_return, fps))
-                if self._log_wandb:
-                    self._wandb_dict['Common/training_return'] = episode_return
 
                 episode_steps = 0
                 episode_return = 0
