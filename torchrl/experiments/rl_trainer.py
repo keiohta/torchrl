@@ -8,7 +8,7 @@ import torch
 import wandb
 
 from torchrl.misc import (get_replay_buffer, prepare_output_dir,
-                          initialize_logger, render_env)
+                          initialize_logger, render_env, CheckpointManager)
 
 torch.backends.cudnn.benchmark = True
 
@@ -136,6 +136,10 @@ class RLTrainer:
         self._save_test_path = args.save_test_path
         self._save_test_movie = args.save_test_movie
         self._show_test_images = args.show_test_images
+
+    def _set_checkpoint(self, model_dir):
+        self._ckpt_manager = CheckpointManager(directory=self._output_dir,
+                                               max_to_keep=5)
 
     def __call__(self):
         total_steps = 0

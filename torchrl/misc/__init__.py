@@ -1,3 +1,4 @@
+from .checkpoint import CheckpointManager
 from .get_replay_buffer import *
 from .huber_loss import huber_loss
 from .initialize_logger import initialize_logger
