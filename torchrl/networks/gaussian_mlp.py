@@ -26,7 +26,7 @@ class GaussianMLP(nn.Module):
         self._norm_dist_class = normal_distribution_cls
 
         self._mean_module = nn.Sequential()
-        in_dim = state_shape
+        in_dim = state_shape + action_dim
         for idx, unit in enumerate(units):
             linear_layer = nn.Linear(in_dim, unit)
             w_init(linear_layer.weight)

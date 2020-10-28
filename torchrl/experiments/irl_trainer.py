@@ -20,12 +20,14 @@ class IRLTrainer(Trainer):
                  expert_act,
                  test_env=None):
         self._irl = irl
+        self.device = device
         args.dir_suffix = self._irl.policy_name + args.dir_suffix
         super().__init__(policy, env, device, args, test_env)
         # TODO: Add assertion to check dimention of expert demos and current policy, env is the same
-        self._expert_obs = torch.from_numpy(expert_obs)
-        self._expert_next_obs = torch.from_numpy(expert_next_obs)
-        self._expert_act = torch.from_numpy(expert_act)
+        self._expert_obs = torch.from_numpy(expert_obs).to(self.device)
+        self._expert_next_obs = torch.from_numpy(expert_next_obs).to(
+            self.device)
+        self._expert_act = torch.from_numpy(expert_act).to(self.device)
         # Minus one to get next obs
         self._random_range = range(expert_obs.shape[0])
 

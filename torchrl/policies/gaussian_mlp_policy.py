@@ -20,7 +20,7 @@ class GaussianMLPPolicy(nn.Module):
                  std_parameterization='exp'):
         super(GaussianMLPPolicy, self).__init__()
         self.device = device
-        self.module = GaussianMLP(state_shape,
+        self.module = GaussianMLP(state_shape[0],
                                   action_dim,
                                   units=units,
                                   hidden_nonlinearity=hidden_nonlinearity,
