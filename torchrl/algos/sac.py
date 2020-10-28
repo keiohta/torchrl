@@ -3,47 +3,43 @@ from collections import OrderedDict
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
 from torchrl.policies import OffPolicyAgent, GaussianActor
 from torchrl.misc import update_network_variables
+
+torch.backends.cudnn.benchmark = True
 
 
 class CriticV(nn.Module):
     def __init__(self, state_shape, critic_units=(256, 256)):
         super(CriticV, self).__init__()
 
-        self.net = nn.Sequential(
-            OrderedDict([
-                ('l1', nn.Linear(state_shape[0], critic_units[0])),
-                ('relu1', nn.ReLU()),
-                ('l2', nn.Linear(critic_units[0], critic_units[1])),
-                ('relu2', nn.ReLU()),
-                ('out', nn.Linear(critic_units[1], 1)),
-            ]))
+        self.l1 = nn.Linear(state_shape[0], critic_units[0])
+        self.l2 = nn.Linear(critic_units[0], critic_units[1])
+        self.l3 = nn.Linear(critic_units[1], 1)
 
     def forward(self, states):
-        values = self.net(states)
-        return torch.squeeze(values, dim=1)
+        features = F.relu(self.l1(states))
+        features = F.relu(self.l2(features))
+        values = self.l3(features)
+        return torch.squeeze(values, -1)
 
 
 class CriticQ(nn.Module):
     def __init__(self, state_shape, action_dim, critic_units=(256, 256)):
         super(CriticQ, self).__init__()
 
-        self.net = nn.Sequential(
-            OrderedDict([
-                ('l1', nn.Linear(state_shape[0] + action_dim,
-                                 critic_units[0])),
-                ('relu1', nn.ReLU()),
-                ('l2', nn.Linear(critic_units[0], critic_units[1])),
-                ('relu2', nn.ReLU()),
-                ('out', nn.Linear(critic_units[1], 1)),
-            ]))
+        self.l1 = nn.Linear(state_shape[0] + action_dim, critic_units[0])
+        self.l2 = nn.Linear(critic_units[0], critic_units[1])
+        self.l3 = nn.Linear(critic_units[1], 1)
 
     def forward(self, features):
-        values = self.net(features)
-        return torch.squeeze(values, dim=1)
+        features = F.relu(self.l1(features))
+        features = F.relu(self.l2(features))
+        values = self.l3(features)
+        return torch.squeeze(values, -1)
 
 
 class SAC(OffPolicyAgent):
@@ -115,7 +111,12 @@ class SAC(OffPolicyAgent):
         self.vf = CriticV(state_shape, critic_units).to(self.device)
         self.vf_target = CriticV(state_shape, critic_units).to(self.device)
         update_network_variables(self.vf_target, self.vf, tau=1.)
+        self._update_net_requires_grad(self.vf_target)
         self.vf_optim = optim.Adam(self.vf.parameters(), lr=lr)
+
+    def _update_net_requires_grad(self, net, requires_grad=False):
+        for p in net.parameters():
+            p.requires_grad = requires_grad
 
     def get_action(self, state, test=False):
         if isinstance(state, np.ndarray):
@@ -141,11 +142,8 @@ class SAC(OffPolicyAgent):
               dones,
               weights=None,
               wandb_dict=None):
-        if weights is None:
-            weights = torch.ones_like(rewards)
-
         td_errors, actor_loss, vf_loss, qf_loss, logp_min, logp_max, logp_mean = self._train_body(
-            states, actions, next_states, rewards, dones, weights)
+            states, actions, next_states, rewards, dones)
 
         # Log to wandb if set
         if wandb_dict is not None:
@@ -162,29 +160,27 @@ class SAC(OffPolicyAgent):
 
         return td_errors
 
-    def _train_body(self, states, actions, next_states, rewards, dones,
-                    weights):
-        assert len(dones.shape) == 2
-        assert len(rewards.shape) == 2
+    def _train_body(self, states, actions, next_states, rewards, dones):
         rewards = torch.squeeze(rewards, dim=1)
         dones = torch.squeeze(dones, dim=1)
 
-        not_dones = 1. - dones
-
         # Compute loss of critic Q
-        features = torch.cat([states, actions], dim=1).to(self.device)
+        features = torch.cat([states, actions], dim=1)
         current_q1 = self.qf1(features)
         current_q2 = self.qf2(features)
-        next_v_target = self.vf_target(next_states)
-
-        target_q = (rewards +
-                    not_dones * self.discount * next_v_target).detach()
+        with torch.no_grad():
+            not_dones = 1. - dones
+            next_v_target = self.vf_target(next_states)
+            target_q = rewards + not_dones * self.discount * next_v_target
 
         td_loss_q1 = torch.mean((current_q1 - target_q).pow(2))
         td_loss_q2 = torch.mean((current_q2 - target_q).pow(2))  # Eq.7
 
-        self._update_optim(self.qf1_optim, self.qf1, td_loss_q1, True)
-        self._update_optim(self.qf2_optim, self.qf2, td_loss_q2, True)
+        self._update_optim(self.qf1_optim, self.qf1, td_loss_q1)
+        self._update_optim(self.qf2_optim, self.qf2, td_loss_q2)
+
+        self._update_net_requires_grad(self.qf1, requires_grad=False)
+        self._update_net_requires_grad(self.qf2, requires_grad=False)
 
         # Compute loss of critic V
         current_v = self.vf(states)
@@ -197,59 +193,35 @@ class SAC(OffPolicyAgent):
         sampled_current_q2 = self.qf2(features)
         current_min_q = torch.min(sampled_current_q1, sampled_current_q2)
 
-        target_v = (current_min_q - self.alpha * logp).detach()
+        with torch.no_grad():
+            target_v = (current_min_q - self.alpha * logp)
         td_errors = target_v - current_v
         td_loss_v = torch.mean(td_errors.pow(2))  # Eq.(5)
 
         # Compute loss of policy
         policy_loss = torch.mean(self.alpha * logp - current_min_q)  # Eq.(12)
 
-        self._update_optim(self.vf_optim, self.vf, td_loss_v, True)
-        update_network_variables(self.vf_target, self.vf, self.tau)
-        self._update_optim(self.actor_optim, self.actor, policy_loss, True)
+        self._update_optim(self.vf_optim, self.vf, td_loss_v)
+        with torch.no_grad():
+            update_network_variables(self.vf_target, self.vf, self.tau)
+        self._update_optim(self.actor_optim, self.actor, policy_loss)
+
+        self._update_net_requires_grad(self.qf1, requires_grad=True)
+        self._update_net_requires_grad(self.qf2, requires_grad=True)
 
         # Compute loss of temperature parameter for entropy
         if self.auto_alpha:
             alpha_loss = -torch.mean(
                 (self.log_alpha * (logp + self.target_alpha).detach()))
-
-        if self.auto_alpha:
             self._update_optim(self.alpha_optim, None, alpha_loss)
-            self.alpha = torch.exp(self.log_alpha)
+            self.alpha = torch.jit.script(torch.exp(self.log_alpha))
 
         return td_errors, policy_loss, td_loss_v, td_loss_q1, torch.min(
             logp), torch.max(logp), torch.mean(logp)
 
-    def compute_td_error(self, states, actions, next_states, rewards, dones):
-        if isinstance(actions, torch.Tensor):
-            rewards = torch.unsqueeze(rewards, -1)
-            dones = torch.unsqueeze(dones, -1)
-        td_errors = self._compute_td_error_body(states, actions, next_states,
-                                                rewards, dones)
-        return td_errors.detach().numpy()
-
-    def _compute_td_error_body(self, states, actions, next_states, rewards,
-                               dones):
-        not_dones = 1. - dones
-
-        # Compute TD errors for Q-value func
-        features = torch.cat([states, actions], dim=1)
-        current_q1 = self.qf1(features)
-        vf_next_target = self.vf_target(next_states)
-
-        target_q = (rewards +
-                    not_dones * self.discount * vf_next_target).detach()
-
-        td_errors_q1 = target_q - current_q1
-
-        return td_errors_q1
-
-    def _update_optim(self, optim, net, loss, retain_graph=False):
-        optim.zero_grad()
-        loss.backward(retain_graph=retain_graph)
-        # if self.grad_clip is not None:
-        #     for p in net.modules():
-        #         nn.utils.clip_grad_norm_(p.parameters(), self.grad_clip)
+    def _update_optim(self, optim, net, loss):
+        optim.zero_grad(set_to_none=True)
+        loss.backward()
         optim.step()
 
     @staticmethod

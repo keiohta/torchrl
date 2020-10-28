@@ -16,6 +16,14 @@ if __name__ == '__main__':
     parser.set_defaults(max_steps=3e6)
     args = parser.parse_args()
 
+    # setup wandb
+    wandb_configs = None
+    if args.wandb_turn_on:
+        wandb_configs = {}
+        for arg in vars(args):
+            if 'wandb' in arg:
+                wandb_configs[arg.replace('wandb_', '')] = vars(args)[arg]
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
