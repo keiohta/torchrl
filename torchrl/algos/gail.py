@@ -3,6 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
 from torchrl.policies import IRLPolicy
@@ -22,19 +23,15 @@ class Discriminator(nn.Module):
 
         LinearClass = spectral_norm_linaer if enable_sn else nn.Linear
 
-        # yapf: disable
-        self.net = nn.Sequential(OrderedDict([
-            ('l1', LinearClass(state_shape[0]+action_dim, units[0])),
-            ('relu1', nn.ReLU()),
-            ('l2', LinearClass(units[0], units[1])),
-            ('relu2', nn.ReLU()),
-            ('l3', LinearClass(units[1], 1)),
-            ('out', nn.Sigmoid())
-        ]))
-        # yapf: enable
+        self.l1 = LinearClass(state_shape[0] + action_dim, units[0])
+        self.l2 = LinearClass(units[0], units[1])
+        self.l3 = LinearClass(units[1], 1)
+        self.out = nn.Sigmoid()
 
     def forward(self, inputs):
-        out = self.net(inputs)
+        features = F.relu(self.l1(inputs))
+        features = F.relu(self.l2(features))
+        out = self.out(self.l3(features))
         return out
 
     def compute_reward(self, inputs):
@@ -90,7 +87,7 @@ class GAIL(IRLPolicy):
         loss = -(torch.mean(torch.log(real_logits + epsilon)) +
                  torch.mean(torch.log(1. - fake_logits + epsilon)))
 
-        self.optim.zero_grad()
+        self.optim.zero_grad(set_to_none=True)
         loss.backward()
         self.optim.step()
 

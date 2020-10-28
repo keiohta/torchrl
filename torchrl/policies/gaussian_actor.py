@@ -3,11 +3,13 @@ from collections import OrderedDict
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from torchrl.distributions import DiagonalGaussian
 
 
 class GaussianActor(nn.Module):
+    torch.backends.cudnn.benchmark = True
     LOG_SIG_CAP_MAX = 2  # np.e**2 = 7.389
     LOG_SIG_CAP_MIN = -20  # np.e**-10 = 4.540e-05
     EPS = 1e-6
@@ -30,20 +32,17 @@ class GaussianActor(nn.Module):
         self._max_action = max_action
         self._squash = squash
         self._state_independent_std = state_independent_std
+        self._device = device
 
-        self.hidden_net = nn.Sequential(
-            OrderedDict([
-                ('l1', nn.Linear(state_shape[0], units[0])),
-                ('relu1', nn.ReLU()),
-                ('l2', nn.Linear(units[0], units[1])),
-                ('relu2', nn.ReLU()),
-            ]))
+        self.l1 = nn.Linear(state_shape[0], units[0])
+        self.l2 = nn.Linear(units[0], units[1])
         self.out_mean = nn.Linear(units[1], action_dim)
         if not self._fix_std:
             if self._state_independent_std:
                 self.out_log_std = torch.tensor(
                     initial_value=-0.5 * np.ones(action_dim, dtype=np.float32),
-                    dtype=torch.float32)
+                    dtype=torch.float32,
+                    device=self._device)
             else:
                 self.out_log_std = nn.Linear(units[1], action_dim)
 
@@ -55,19 +54,17 @@ class GaussianActor(nn.Module):
             NN outputs mean and standard deviation to compute the distribution
         :return (Dict): Multivariate normal distribution
         """
-        features = self.hidden_net(states)
+        features = F.relu(self.l1(states))
+        features = F.relu(self.l2(features))
         mean = self.out_mean(features)
+
         if self._fix_std:
-            log_std = torch.ones_like(mean) * torch.log(self._const_std)
+            log_std = torch.ones_like(mean, device=self._device) * torch.log(
+                self._const_std)
         else:
-            if self._state_independent_std:
-                log_std = torch.tile(input=torch.unsqueeze(self.out_log_std,
-                                                           axis=0),
-                                     multiples=[mean.shape[0], 1])
-            else:
-                log_std = self.out_log_std(features)
-                log_std = torch.clamp(log_std, self.LOG_SIG_CAP_MIN,
-                                      self.LOG_SIG_CAP_MAX)
+            log_std = self.out_log_std(features)
+            log_std = torch.clamp(log_std, self.LOG_SIG_CAP_MIN,
+                                  self.LOG_SIG_CAP_MAX)
 
         return {"mean": mean, "log_std": log_std}
 
@@ -88,7 +85,7 @@ class GaussianActor(nn.Module):
             actions = torch.tanh(raw_actions)
             logp_pis = self._squash_correction(logp_pis, actions)
 
-        return actions * self._max_action, logp_pis
+        return torch.mul(actions, self._max_action), logp_pis
 
     def compute_log_probs(self, states, actions):
         actions /= self._max_action
@@ -103,5 +100,5 @@ class GaussianActor(nn.Module):
         return self.dist.entropy(param)
 
     def _squash_correction(self, logp_pis, actions):
-        diff = torch.sum(torch.log(1. - actions**2 + self.EPS), axis=1)
+        diff = torch.sum(torch.log(1. - actions.pow(2) + self.EPS), axis=1)
         return logp_pis - diff

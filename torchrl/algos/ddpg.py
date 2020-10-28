@@ -45,8 +45,7 @@ class Critic(nn.Module):
         features = F.relu(self.l2(features))
         values = self.l3(features)
 
-        # return torch.squeeze(values, dim=1)
-        return values
+        return torch.squeeze(values, -1)
 
 
 class DDPG(OffPolicyAgent):
