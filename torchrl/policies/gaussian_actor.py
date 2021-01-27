@@ -34,9 +34,12 @@ class GaussianActor(nn.Module):
         self._state_independent_std = state_independent_std
         self._device = device
 
-        self.l1 = nn.Linear(state_shape[0], units[0])
-        self.l2 = nn.Linear(units[0], units[1])
-        self.out_mean = nn.Linear(units[1], action_dim)
+        base_layers = []
+        for idx in range(len(units)):
+            input_dim = state_shape[0] if idx == 0 else units[idx - 1]
+            base_layers.append(nn.Linear(input_dim, units[idx]))
+        self.base_layers = nn.Sequential(*base_layers)
+        self.out_mean = nn.Linear(units[-1], action_dim)
         if not self._fix_std:
             if self._state_independent_std:
                 self.out_log_std = torch.tensor(
@@ -44,7 +47,7 @@ class GaussianActor(nn.Module):
                     dtype=torch.float32,
                     device=self._device)
             else:
-                self.out_log_std = nn.Linear(units[1], action_dim)
+                self.out_log_std = nn.Linear(units[-1], action_dim)
 
     def _compute_dist(self, states):
         """
@@ -54,8 +57,9 @@ class GaussianActor(nn.Module):
             NN outputs mean and standard deviation to compute the distribution
         :return (Dict): Multivariate normal distribution
         """
-        features = F.relu(self.l1(states))
-        features = F.relu(self.l2(features))
+        features = states
+        for layer in self.base_layers:
+            features = F.relu(layer(features))
         mean = self.out_mean(features)
 
         if self._fix_std:

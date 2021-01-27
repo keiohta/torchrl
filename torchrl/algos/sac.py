@@ -16,14 +16,17 @@ class CriticV(nn.Module):
     def __init__(self, state_shape, critic_units=(256, 256)):
         super(CriticV, self).__init__()
 
-        self.l1 = nn.Linear(state_shape[0], critic_units[0])
-        self.l2 = nn.Linear(critic_units[0], critic_units[1])
-        self.l3 = nn.Linear(critic_units[1], 1)
+        base_layers = []
+        for idx in range(len(critic_units)):
+            input_dim = state_shape[0] if idx == 0 else critic_units[idx - 1]
+            base_layers.append(nn.Linear(input_dim, critic_units[idx]))
+        self.base_layers = nn.Sequential(*base_layers)
+        self.out = nn.Linear(critic_units[-1], 1)
 
-    def forward(self, states):
-        features = F.relu(self.l1(states))
-        features = F.relu(self.l2(features))
-        values = self.l3(features)
+    def forward(self, features):
+        for layer in self.base_layers:
+            features = F.relu(layer(features))
+        values = self.out(features)
         return torch.squeeze(values, -1)
 
 
@@ -31,14 +34,17 @@ class CriticQ(nn.Module):
     def __init__(self, state_shape, action_dim, critic_units=(256, 256)):
         super(CriticQ, self).__init__()
 
-        self.l1 = nn.Linear(state_shape[0] + action_dim, critic_units[0])
-        self.l2 = nn.Linear(critic_units[0], critic_units[1])
-        self.l3 = nn.Linear(critic_units[1], 1)
+        base_layers = []
+        for idx in range(len(critic_units)):
+            input_dim = state_shape[0] + action_dim if idx == 0 else critic_units[idx - 1]
+            base_layers.append(nn.Linear(input_dim, critic_units[idx]))
+        self.base_layers = nn.Sequential(*base_layers)
+        self.out = nn.Linear(critic_units[-1], 1)
 
     def forward(self, features):
-        features = F.relu(self.l1(features))
-        features = F.relu(self.l2(features))
-        values = self.l3(features)
+        for layer in self.base_layers:
+            features = F.relu(layer(features))
+        values = self.out(features)
         return torch.squeeze(values, -1)
 
 
@@ -64,6 +70,7 @@ class SAC(OffPolicyAgent):
                          n_warmup=n_warmup,
                          **kwargs)
 
+        self.exp_name = f"L{len(actor_units)}-U{actor_units[0]}"
         self.device = device
         self._setup_actor(state_shape, action_dim, actor_units, lr, max_action)
         self._setup_critic_v(state_shape, critic_units, lr)
