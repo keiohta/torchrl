@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import time
+import joblib
 
 import numpy as np
 import torch
@@ -107,6 +108,8 @@ class RLTrainer:
                             help='Flag to use nstep experience replay')
         parser.add_argument('--n-step', type=int, default=4,
                             help='Number of steps to look over')
+        parser.add_argument('--dump-data', action='store_true',
+                            help='Dump all transitions in the replay buffer after finishing training')
         # others
         parser.add_argument('--logging-level', choices=['DEBUG', 'INFO', 'WARNING'],
                             default='INFO', help='Logging level')
@@ -130,6 +133,7 @@ class RLTrainer:
         self._use_prioritized_rb = args.use_prioritized_rb
         self._use_nstep_rb = args.use_nstep_rb
         self._n_step = args.n_step
+        self._dump_data = args.dump_data
         # test settings
         self._test_interval = args.test_interval
         self._show_test_progress = args.show_test_progress
@@ -189,8 +193,8 @@ class RLTrainer:
                                        episode_start_time)
                 self.logger.info(
                     "Total Epi: {0: 5} Steps: {1: 7} Episode Steps: {2: 5} Return: {3: 5.4f} FPS: {4:5.2f}"
-                    .format(n_episode, total_steps, episode_steps,
-                            episode_return, fps))
+                        .format(n_episode, total_steps, episode_steps,
+                                episode_return, fps))
 
                 episode_steps = 0
                 episode_return = 0
@@ -229,7 +233,7 @@ class RLTrainer:
                 avg_test_return = self.evaluate_policy(total_steps)
                 self.logger.info(
                     "Evaluation Total Steps: {0: 7} Average Reward {1: 5.4f} over {2: 2} episodes"
-                    .format(total_steps, avg_test_return, self._test_episodes))
+                        .format(total_steps, avg_test_return, self._test_episodes))
                 if self._log_wandb:
                     self._wandb_dict[
                         'Common/average_test_return'] = avg_test_return
@@ -237,10 +241,17 @@ class RLTrainer:
 
             if total_steps % self._save_model_interval == 0:
                 if isinstance(self._policy, SAC):
-                    torch.save(self._policy.qf1.state_dict(), os.path.join(self._logdir, f'critic_q_{total_steps:07d}.pth'))
+                    torch.save(self._policy.qf1.state_dict(),
+                               os.path.join(self._output_dir,
+                                            f'critic_q_{total_steps:07d}_{self._policy.exp_name}.pth'))
 
             if self._log_wandb:
                 wandb.log(self._wandb_dict)
+
+        if self._dump_data:
+            samples = replay_buffer.get_all_transitions()
+            joblib.dump(samples,
+                        os.path.join(self._output_dir, f"all_transition_{self._policy.exp_name}.pkl"), compress=3)
 
     def _log_gym_to_wandb(self, filename):
         # obtain gym.env from rllab.env
@@ -307,6 +318,6 @@ class RLTrainer:
         torch_samples['rew'] = torch.from_numpy(samples['rew']).to(self.device)
         torch_samples['done'] = torch.tensor(samples['done'],
                                              dtype=torch.float32).to(
-                                                 self.device)
+            self.device)
 
         return torch_samples
