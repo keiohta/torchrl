@@ -9,6 +9,7 @@ import wandb
 
 from torchrl.misc import (get_replay_buffer, prepare_output_dir,
                           initialize_logger, render_env, CheckpointManager)
+from torchrl.algos.sac import SAC
 
 torch.backends.cudnn.benchmark = True
 
@@ -233,6 +234,10 @@ class RLTrainer:
                     self._wandb_dict[
                         'Common/average_test_return'] = avg_test_return
                     self._wandb_dict['Common/fps'] = fps
+
+            if total_steps % self._save_model_interval == 0:
+                if isinstance(self._policy, SAC):
+                    torch.save(self._policy.qf1.state_dict(), os.path.join(self._logdir, f'critic_q_{total_steps:07d}.pth'))
 
             if self._log_wandb:
                 wandb.log(self._wandb_dict)
