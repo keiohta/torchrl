@@ -250,6 +250,18 @@ class RLTrainer:
 
         if self._dump_data:
             samples = replay_buffer.get_all_transitions()
+            n_batch = replay_buffer.get_stored_size() // self._policy.batch_size
+            target_vals = []
+            for batch_idx in range(n_batch):
+                start_idx, last_idx = np.array([batch_idx, batch_idx + 1]) * self._policy.batch_size
+                next_states = torch.from_numpy(samples["next_obs"][start_idx:last_idx]).to(self.device)
+                rewards = torch.from_numpy(np.squeeze(samples["rew"][start_idx:last_idx])).to(self.device)
+                dones = torch.from_numpy(np.squeeze(samples["done"][start_idx:last_idx])).to(self.device)
+                not_dones = 1. - dones
+                next_v_target = self._policy.vf_target(next_states)
+                target_q = rewards + not_dones * self._policy.discount * next_v_target
+                target_vals.append(target_q.to('cpu').detach().numpy().copy())
+            samples["target_val_q"] = np.expand_dims(np.array(target_vals).flatten(), axis=1)
             joblib.dump(samples,
                         os.path.join(self._output_dir, f"all_transition_{self._policy.exp_name}.pkl"), compress=3)
 
